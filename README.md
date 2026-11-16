@@ -45,3 +45,5 @@ python final_test.py data/sweden
 ```
 
 [Final test results by tile](site/final-results.json) include the original checkpoint hash and both cutoffs for independent reproduction.
+
+The page header uses a resized [Landsat 8 view of the 2013 Elbe flood](https://commons.wikimedia.org/wiki/File:NASA_Earth_-_Elbe-Hochwasser_7_Juni_2013.jpg), credited to the U.S. Geological Survey and NASA Earth Observatory. The header image is illustrative. The model replay displays MMFlood radar and masks.
