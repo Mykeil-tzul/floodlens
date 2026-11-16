@@ -50,20 +50,21 @@ class RemoteZip(io.RawIOBase):
 EVENTS = ("EMSR107", "EMSR184", "EMSR280", "EMSR265")
 
 
-def fetch(directory):
+def fetch(directory, events=EVENTS, tiles=15):
     directory.mkdir(parents=True, exist_ok=True)
     remote = RemoteZip()
     with ZipFile(remote) as archive:
         entries = {item.filename: item for item in archive.infolist()}
         jobs = []
-        for event in EVENTS:
+        for event in events:
             matches = sorted(name for name in entries if name.startswith("mmflood/" + event + "-")
                              and "/mask/" in name and name.endswith(".tif")
                              and name.replace("/mask/", "/s1_raw/") in entries)
             if not matches:
                 raise ValueError(f"No paired data for {event}")
             # Spread samples through each event's sorted chip names.
-            chosen = [matches[i * len(matches) // min(15, len(matches))] for i in range(min(15, len(matches)))]
+            count = min(tiles, len(matches))
+            chosen = [matches[i * len(matches) // count] for i in range(count)]
             for name in chosen:
                 jobs.extend((entries[name], entries[name.replace("/mask/", "/s1_raw/")]))
         print(f"Downloading {len(jobs)//2} paired satellite chips", flush=True)
@@ -104,4 +105,9 @@ def fetch(directory):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", type=Path)
-    fetch(parser.parse_args().directory)
+    parser.add_argument("--event", action="append", help="Limit extraction to this activation ID.")
+    parser.add_argument("--tiles", type=int, default=15)
+    args = parser.parse_args()
+    if args.tiles < 1:
+        parser.error("--tiles must be positive")
+    fetch(args.directory, args.event or EVENTS, args.tiles)

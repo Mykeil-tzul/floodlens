@@ -2,12 +2,20 @@ const $=id=>document.getElementById(id);
 const el=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n;};
 const pct=value=>(value*100).toFixed(1)+"%";
 const count=value=>new Intl.NumberFormat("en").format(value);
+let map;
+let requestId=0;
 async function start(){
- const response=await fetch("results.json");
+ const current=++requestId;
+ const response=await fetch($("event-select").value);
  if(!response.ok)throw Error("Results unavailable");
  const data=await response.json();
- $("event").textContent="France floods · January 2018 · "+data.event+" held-out Copernicus activation";
- $("coverage").textContent=data.training+" training tiles from other events · "+data.test+" France tiles · 128 × 128 pixels per tile. The radar threshold scored higher on this geographic holdout. An early CNN result was inspected during development.";
+ if(current!==requestId)return;
+ const final=Boolean(data.checkpoint_sha256);
+ $("event").textContent=(data.title||"France floods · January 2018")+" · "+data.event;
+ $("coverage").textContent=data.test+" sampled tiles · 128 × 128 pixels per tile. "+
+  (final?"The original checkpoint and both cutoffs were frozen before scoring this event.":"The event was held out from fitting, and an early result was inspected during development.")+
+  (data.metrics.model.iou>data.metrics.threshold.iou?" The CNN scored higher on IoU.":" The radar threshold matched or exceeded the CNN on IoU.");
+ if(map){map.remove();map=null;}
  $("comparison").replaceChildren(...Object.entries(data.metrics).map(([key,m])=>{
   const row=el("tr","");
   row.append(...[key==="model"?"Convolutional model":"Radar threshold",pct(m.iou),pct(m.precision),pct(m.recall),count(m.fp),count(m.fn)].map(x=>el("td",x)));
@@ -15,7 +23,7 @@ async function start(){
  }));
  const rectangles=new Map();
  if(window.L){
-  const map=L.map("map",{scrollWheelZoom:false});
+  map=L.map("map",{scrollWheelZoom:false});
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors",maxZoom:18}).addTo(map);
   for(const tile of data.tiles){
    const [w,s,e,n]=tile.bounds;
@@ -45,6 +53,8 @@ async function start(){
   if(sort==="name"&&previous)$("tile").value=previous;
   render();
  }
- $("tile").onchange=render;$("sort").onchange=options;options();$("status").textContent="";
+ $("tile").value="";$("tile").onchange=render;$("sort").onchange=options;options();$("status").textContent="";
 }
-start().catch(()=>{$("status").textContent="The replay could not load. Try refreshing.";});
+function loadEvent(){start().catch(()=>{$("status").textContent="The selected replay could not load. Try refreshing.";});}
+$("event-select").onchange=loadEvent;
+loadEvent();

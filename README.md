@@ -27,3 +27,21 @@ The downloader fetches byte ranges from Zenodo’s archive and checks each extra
 ## Credits
 
 Radar and reference masks are adapted from [MMFlood by Fabio Montello, Edoardo Arnaudo, and Claudio Rossi](https://zenodo.org/records/6534637), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Preview images were resized, contrast-scaled, and colorized. Event identifiers and source mapping come from Copernicus Emergency Management Service. Background map tiles are by [OpenStreetMap contributors](https://www.openstreetmap.org/copyright).
+
+## Frozen final test · Western Sweden, February 2020
+
+I selected [Copernicus activation EMSR427](https://mapping.emergency.copernicus.eu/activations/EMSR427/) and committed the [sampling rule, checkpoint hash, and cutoffs](final-test-plan.json) before downloading the 30 selected tile pairs. I ran the original model and threshold without refitting or retuning either one. Switch between Sweden and France in the replay to see both experiments.
+
+| Sweden final test | IoU | Precision | Recall | False positives | Missed flood pixels |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| CNN | 5.17% | 5.62% | 39.11% | 44,957 | 4,171 |
+| Radar threshold | 5.85% | 7.48% | 21.17% | 17,943 | 5,400 |
+
+The CNN found more of the labeled flood pixels and produced roughly 2.5 times as many false alarms as the threshold. The threshold had slightly better overlap, and both methods performed poorly on this event. The gap from France is a warning about how these methods transfer across floods. Results are pooled pixel counts from 30 sampled tiles in one new activation.
+
+```sh
+python fetch_mmflood.py data/sweden --event EMSR427 --tiles 30
+python final_test.py data/sweden
+```
+
+[Final test results by tile](site/final-results.json) include the original checkpoint hash and both cutoffs for independent reproduction.

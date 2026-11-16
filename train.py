@@ -82,24 +82,11 @@ def save_view(path, image, mask, valid, color):
     Image.fromarray(gray).save(path)
 
 
-def run(directory, output, epochs):
-    examples = load_tiles(directory)
-    earlier = [item for item in examples if not item[0].startswith(HOLDOUT + "-")]
-    later = [item for item in examples if item[0].startswith(HOLDOUT + "-")]
-    if not earlier or not later:
-        raise ValueError("Training and held-out events must both be present.")
-    cutoff = max(np.arange(.15, .76, .025),
-                 key=lambda t: report(sum(scores(x[0] < t, y, v) for _, x, y, v, _ in earlier))["iou"])
-    detector = train(earlier, epochs)
-    with torch.inference_mode():
-        fitted = detector(torch.tensor(np.stack([item[1] for item in earlier])))[:, 0].sigmoid().numpy()
-    probability_cutoff = max(np.arange(.05, .96, .025), key=lambda t: report(sum(
-        scores(p >= t, y, valid) for p, (_, _, y, valid, _) in zip(fitted, earlier)))["iou"])
+def export_replay(examples, output, detector, cutoff, probability_cutoff):
     (output / "tiles").mkdir(parents=True, exist_ok=True)
-    torch.save(detector.state_dict(), output.parent / "model.pt")
     totals = {"model": np.zeros(3, dtype=int), "threshold": np.zeros(3, dtype=int)}
     tiles = []
-    for name, x, labels, valid, bounds in later:
+    for name, x, labels, valid, bounds in examples:
         with torch.inference_mode():
             predicted = detector(torch.from_numpy(x[None]))[0, 0].sigmoid().numpy() >= probability_cutoff
         threshold = x[0] < cutoff
@@ -118,8 +105,27 @@ def run(directory, output, epochs):
         tiles.append({"id": name, "bounds": bounds, "model": report(scores(predicted, labels, valid)),
                       "threshold": report(scores(threshold, labels, valid)),
                       "water_fraction": float(((labels == 1) & valid).sum() / max(1, valid.sum()))})
+    return {key: report(value) for key, value in totals.items()}, tiles
+
+
+def run(directory, output, epochs):
+    examples = load_tiles(directory)
+    earlier = [item for item in examples if not item[0].startswith(HOLDOUT + "-")]
+    later = [item for item in examples if item[0].startswith(HOLDOUT + "-")]
+    if not earlier or not later:
+        raise ValueError("Training and held-out events must both be present.")
+    cutoff = max(np.arange(.15, .76, .025),
+                 key=lambda t: report(sum(scores(x[0] < t, y, v) for _, x, y, v, _ in earlier))["iou"])
+    detector = train(earlier, epochs)
+    with torch.inference_mode():
+        fitted = detector(torch.tensor(np.stack([item[1] for item in earlier])))[:, 0].sigmoid().numpy()
+    probability_cutoff = max(np.arange(.05, .96, .025), key=lambda t: report(sum(
+        scores(p >= t, y, valid) for p, (_, _, y, valid, _) in zip(fitted, earlier)))["iou"])
+    (output / "tiles").mkdir(parents=True, exist_ok=True)
+    torch.save(detector.state_dict(), output.parent / "model.pt")
+    metrics, tiles = export_replay(later, output, detector, cutoff, probability_cutoff)
     result = {"event": HOLDOUT, "training": len(earlier), "test": len(later), "epochs": epochs,
-              "threshold_cutoff": float(cutoff), "model_cutoff": float(probability_cutoff), "metrics": {key: report(value) for key, value in totals.items()},
+              "threshold_cutoff": float(cutoff), "model_cutoff": float(probability_cutoff), "metrics": metrics,
               "tiles": tiles}
     (output / "results.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result["metrics"], indent=2))
