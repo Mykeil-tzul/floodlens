@@ -1,0 +1,13 @@
+{
+  "event": "EMSR427",
+  "title": "Western Sweden floods · February 2020",
+  "tiles": 30,
+  "sample_rule": "Sort all paired archive paths lexicographically and select index floor(i * N / 30) for i = 0 to 29.",
+  "checkpoint_commit": "e89db94",
+  "checkpoint_sha256": "0a8e3209a4e2c28b28b6578dc0dd03a97b970a52ef9bd1cb719d2ce95f1c309a",
+  "model_cutoff": 0.40000000000000013,
+  "threshold_cutoff": 0.5249999999999999,
+  "primary_metric": "Pooled pixel intersection over union",
+  "secondary_metrics": ["precision", "recall", "true positives", "false positives", "false negatives"],
+  "policy": "Use the existing preprocessing and metric code. Do not refit or adjust either threshold after inspecting Sweden. Keep every selected tile."
+}
